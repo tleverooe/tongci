@@ -575,7 +575,7 @@ function historyCard(g, list) {
     </section>`;
   }
   return `<section class="card">
-    <div class="card-head"><h3>对局记录</h3><span class="pill">${count} 轮 · 最新在上</span></div>
+    <div class="card-head"><h3>对局记录</h3><span class="pill">${count} 轮</span></div>
     ${html}
   </section>`;
 }
