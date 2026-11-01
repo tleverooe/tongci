@@ -140,7 +140,7 @@ function renderHome(prefill = "", error = "") {
       </div>
       <p class="error" id="err">${esc(error)}</p>
       <div class="divider"><span>或者</span></div>
-      <button id="create" class="btn soft block">创建新房间</button>
+      <button id="create" class="btn primary block">创建新房间</button>
     </section>
   </main>`;
 
