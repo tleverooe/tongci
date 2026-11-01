@@ -29,6 +29,7 @@ const REVEAL_MS = 4000;      // 每轮揭晓停留时间
 const MAX_WORD = 20;
 const MAX_NAME = 12;
 const TONES = ["purple", "orange", "teal", "pink"];
+const COPY_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 5.5v-.5A2.5 2.5 0 0 0 13 2.5H7A2.5 2.5 0 0 0 4.5 5v6A2.5 2.5 0 0 0 7 13.5h.5"/></svg>`;
 const HOME_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 11 12 3.8 20.5 11"/><path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></svg>`;
 
 /* ---------- 本地身份：不登录，用随机 id 认人 ---------- */
@@ -382,7 +383,7 @@ function renderLobby() {
   ].join("");
 
   let sub;
-  if (!full) sub = `把房间码 <b>${esc(code)}</b> 发给朋友，还差 ${cap - list.length} 人`;
+  if (!full) sub = `把房间码 <b>${esc(code)}</b><button class="copy-inline" id="copyInline" aria-label="复制房间码">${COPY_SVG}</button>发给朋友，还差 ${cap - list.length} 人`;
   else sub = host ? "大家已就位，点击下方按钮开始联想。" : "大家已就位，等房主开始。";
 
   app.innerHTML = `
@@ -417,7 +418,9 @@ function renderLobby() {
     </div>
   </main>`;
 
-  $("#copyCode").onclick = async () => toast((await copyText(code)) ? `房间码 ${code} 已复制` : "复制失败，请手动记下房间码");
+  const copyCode = async () => toast((await copyText(code)) ? `房间码 ${code} 已复制` : "复制失败，请手动记下房间码");
+  $("#copyCode").onclick = copyCode;
+  $("#copyInline")?.addEventListener("click", copyCode);
   $("#share").onclick = shareInvite;
   app.querySelectorAll("[data-cap]").forEach((b) => {
     b.onclick = () => update(ref(db, `rooms/${code}/settings`), { capacity: Number(b.dataset.cap) });

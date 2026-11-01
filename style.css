@@ -136,6 +136,13 @@ button, input { font: inherit; color: inherit; }
 .seg-btn:disabled { cursor: default; }
 .seg-btn:disabled:not(.on) { color: #d2ccd4; }
 .seg.readonly .seg-btn:disabled:not(.on) { color: var(--muted); }
+.copy-inline {
+  display: inline-grid; place-items: center; vertical-align: -6px;
+  width: 26px; height: 26px; margin: 0 4px; padding: 0; border: 0; border-radius: 8px;
+  background: var(--primary-soft); color: var(--primary); cursor: pointer;
+}
+.copy-inline svg { width: 16px; height: 16px; }
+.copy-inline:hover { background: #e4dcf5; }
 .hint { margin: -8px 0 0; font-size: 13px; color: var(--muted); }
 
 /* ---------- 表单 ---------- */
