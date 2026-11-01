@@ -353,6 +353,7 @@ function renderLobby() {
   const list = playerList();
   const cap = room.settings?.capacity || 2;
   const secs = room.settings?.seconds || 30;
+  const noRepeat = !!room.settings?.noRepeat;
   const host = room.hostId === myId;
   const full = list.length >= cap;
 
@@ -381,6 +382,10 @@ function renderLobby() {
     `<button class="seg-btn ${secs === 60 ? "on" : ""}" data-secs="60" ${host ? "" : "disabled"}>60 秒</button>`,
     `<button class="seg-btn ${custom ? "on" : ""}" data-secs="custom" ${host ? "" : "disabled"}>${custom ? `自定义 · ${secs}秒` : "自定义"}</button>`,
   ].join("");
+  const repeatSeg = [
+    `<button class="seg-btn ${!noRepeat ? "on" : ""}" data-norepeat="0" ${host ? "" : "disabled"}>允许</button>`,
+    `<button class="seg-btn ${noRepeat ? "on" : ""}" data-norepeat="1" ${host ? "" : "disabled"}>不允许</button>`,
+  ].join("");
 
   let sub;
   if (!full) sub = `把房间码 <b>${esc(code)}</b><button class="copy-inline" id="copyInline" aria-label="复制房间码">${COPY_SVG}</button>发给朋友，还差 ${cap - list.length} 人`;
@@ -408,7 +413,9 @@ function renderLobby() {
       <div class="seg ${host ? "" : "readonly"}">${capSeg}</div>
       <h3 class="sub-title">每轮思考时间</h3>
       <div class="seg ${host ? "" : "readonly"}">${timeSeg}</div>
-      <p class="hint">每轮 ${secs} 秒 · 全员到齐才能开始${host ? "" : " · 只有房主能改设置"}</p>
+      <h3 class="sub-title">能否重复用之前出现过的词</h3>
+      <div class="seg two ${host ? "" : "readonly"}">${repeatSeg}</div>
+      <p class="hint">每轮 ${secs} 秒 · ${noRepeat ? "不能重复用词" : "可以重复用词"} · 全员到齐才能开始${host ? "" : " · 只有房主能改设置"}</p>
     </section>
 
     <div class="cta">
@@ -436,6 +443,9 @@ function renderLobby() {
       }
       update(ref(db, `rooms/${code}/settings`), { seconds: Number(v) });
     };
+  });
+  app.querySelectorAll("[data-norepeat]").forEach((b) => {
+    b.onclick = () => update(ref(db, `rooms/${code}/settings`), { noRepeat: b.dataset.norepeat === "1" });
   });
   $("#start")?.addEventListener("click", startGame);
 }
@@ -705,11 +715,13 @@ async function submitWord(auto) {
   const k = norm(w);
   if (!k) return err("写一个词再提交");
 
-  const used = new Set();
-  for (let i = 1; i < g.round; i++) {
-    Object.values(g.rounds?.[rk(i)]?.words || {}).forEach((x) => used.add(norm(x)));
+  if (room.settings?.noRepeat) {
+    const used = new Set();
+    for (let i = 1; i < g.round; i++) {
+      Object.values(g.rounds?.[rk(i)]?.words || {}).forEach((x) => used.add(norm(x)));
+    }
+    if (used.has(k)) return err(`「${w}」之前出现过了，换一个`);
   }
-  if (used.has(k)) return err(`「${w}」之前出现过了，换一个`);
   if (now() > g.deadline + 1500) return;
 
   const btn = $("#guess button");

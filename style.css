@@ -128,6 +128,7 @@ button, input { font: inherit; color: inherit; }
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
   padding: 6px; background: var(--seg); border-radius: 16px; margin-bottom: 22px;
 }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
 .seg-btn {
   height: 48px; border: 0; border-radius: 12px; background: transparent;
   color: var(--muted); font-size: 16px; cursor: pointer; white-space: nowrap;
