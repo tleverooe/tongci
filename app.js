@@ -132,14 +132,14 @@ function renderHome(prefill = "", error = "") {
     <section class="card form">
       <label class="label" for="name">你的昵称</label>
       <input id="name" class="input" maxlength="${MAX_NAME}" placeholder="朋友们会看到这个名字" value="${esc(name)}" autocomplete="nickname">
-      <button id="create" class="btn primary block">创建房间</button>
-      <div class="divider"><span>或者加入朋友的房间</span></div>
-      <label class="label" for="code">房间码</label>
+      <label class="label spaced" for="code">加入朋友的房间</label>
       <div class="join-row">
         <input id="code" class="input code-input" maxlength="6" placeholder="6 位房间码" value="${esc(prefill)}" autocapitalize="characters" autocomplete="off">
-        <button id="join" class="btn soft">加入</button>
+        <button id="join" class="btn primary">加入</button>
       </div>
       <p class="error" id="err">${esc(error)}</p>
+      <div class="divider"><span>或者</span></div>
+      <button id="create" class="btn soft block">创建新房间</button>
     </section>
   </main>`;
 
@@ -489,7 +489,7 @@ function renderGame() {
         <p class="prompt after">想一个能同时联系上这些词的新词</p>`;
     }
     const body = mine != null
-      ? `<div class="locked"><span class="muted small">你写的是</span><strong>${esc(mine)}</strong><span class="muted small">等其他人写完就揭晓</span></div>`
+      ? `<div class="locked"><span class="muted small">你写的是</span><strong>${esc(mine)}</strong><span class="muted small" id="waitText">等待中…</span></div>`
       : `<form id="guess" class="guess-form" autocomplete="off">
            <input id="word" class="input big" maxlength="${MAX_WORD}" placeholder="输入一个词" enterkeyhint="send">
            <button class="btn primary" type="submit">提交</button>
@@ -508,11 +508,6 @@ function renderGame() {
       </div>
       <div class="bar"><div class="bar-fill" id="bar"></div></div>
       ${top}
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h3>大家的状态</h3><span class="pill" id="count"></span></div>
-      <div class="status-list" id="status"></div>
     </section>
 
     ${historyCard(g, list)}
@@ -544,35 +539,44 @@ function revealBlock(r, list) {
   }).join("")}</div>`;
 }
 
-// 每轮大家写了什么
-function historyCard(g, list) {
+// 每轮大家写了什么；newestFirst 时最新一轮在最上面
+function roundsList(g, list, newestFirst) {
   const done = [];
   for (let k = 1; k <= (g.round || 0); k++) {
     const r = g.rounds?.[rk(k)];
     if (r?.closed) done.push([k, r]);
   }
-  if (!done.length) {
+  if (newestFirst) done.reverse();
+  const cols = list.map(() => "minmax(0, 1fr)").join(" 22px ");
+  const legend = `<div class="legend">${list.map((p, i) =>
+    `<span class="legend-item">${avatar(i, "xs")}${esc(p.name)}</span>`).join("")}</div>`;
+  const rows = done.map(([k, r]) => {
+    const ids = asList(r.participants);
+    const cells = list.map((p, i) => {
+      const w = r.words?.[p.id];
+      const word = w ? esc(w) : `<span class="muted small">${ids.includes(p.id) ? "超时" : "—"}</span>`;
+      return `<div class="word-tile tone-${toneOf(i)}">${word}</div>`;
+    });
+    const sep = `<span class="sep ${r.matched ? "ok" : ""}">${r.matched ? "✓" : "×"}</span>`;
+    return `<div class="round-row">
+      <div class="round-label">第 ${k} 轮</div>
+      <div class="round-words" style="grid-template-columns:${cols}">${cells.join(sep)}</div>
+    </div>`;
+  }).join("");
+  return { count: done.length, html: legend + rows };
+}
+
+function historyCard(g, list) {
+  const { count, html } = roundsList(g, list, true);
+  if (!count) {
     return `<section class="card">
       <div class="card-head"><h3>对局记录</h3></div>
       <p class="muted small" style="margin:0">每一轮揭晓后，大家写的词会记在这里。</p>
     </section>`;
   }
-  const head = list.map((p, i) => `<th>${avatar(i, "xs")}<span class="th-name">${esc(p.name)}</span></th>`).join("");
-  const rows = done.map(([k, r]) => `
-    <tr class="${r.matched ? "matched" : ""}">
-      <td class="rnd">${k}</td>
-      ${list.map((p) => {
-        const w = r.words?.[p.id];
-        if (w) return `<td>${esc(w)}</td>`;
-        return `<td><span class="muted">${asList(r.participants).includes(p.id) ? "超时" : "—"}</span></td>`;
-      }).join("")}
-    </tr>`).join("");
   return `<section class="card">
-    <div class="card-head"><h3>对局记录</h3><span class="pill">${done.length} 轮</span></div>
-    <div class="table-wrap"><table class="history">
-      <thead><tr><th class="rnd">轮</th>${head}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>
+    <div class="card-head"><h3>对局记录</h3><span class="pill">${count} 轮 · 最新在上</span></div>
+    ${html}
   </section>`;
 }
 
@@ -580,26 +584,14 @@ function historyCard(g, list) {
 function updateDynamic() {
   const g = room?.game;
   if (!g || (g.phase !== "guess" && g.phase !== "reveal")) return;
-  const list = playerList();
-  const words = g.rounds?.[rk(g.round)]?.words || {};
-
-  const st = $("#status");
-  if (st) {
-    st.innerHTML = list.map((p, i) => {
-      const off = p.online === false;
-      const done = words[p.id] != null;
-      let txt, cls;
-      if (off) { txt = "已离线"; cls = "off"; }
-      else if (g.phase === "reveal") { txt = done ? "已揭晓" : "超时"; cls = done ? "done" : "wait"; }
-      else { txt = done ? "已提交" : "思考中…"; cls = done ? "done" : "wait"; }
-      return `<div class="status-row">${avatar(i, "sm")}
-        <span class="status-name">${esc(p.name)}${p.id === myId ? "（你）" : ""}</span>
-        <span class="status ${cls}">${txt}</span></div>`;
-    }).join("");
+  const wt = $("#waitText");
+  if (wt) {
+    const words = g.rounds?.[rk(g.round)]?.words || {};
+    const pending = activePlayers().filter((p) => p.id !== myId && words[p.id] == null);
+    if (!pending.length) wt.textContent = "马上揭晓…";
+    else if (playerList().length === 2) wt.textContent = "等待中… 对方还没写好";
+    else wt.textContent = `等待中… ${pending.map((p) => p.name).join("、")} 还没写好`;
   }
-  const act = activePlayers();
-  const c = $("#count");
-  if (c) c.textContent = `${act.filter((p) => words[p.id] != null).length} / ${act.length}`;
   tick();
 }
 
@@ -677,6 +669,7 @@ function closeRound(n) {
       g.phase = "over";
       g.winRound = n;
       g.winWord = words[ids[0]];
+      g.endedAt = t;
     } else {
       g.phase = "reveal";
       g.revealUntil = t + REVEAL_MS;
@@ -735,6 +728,7 @@ async function giveUp() {
     g.phase = "over";
     g.winRound = null;
     g.winWord = null;
+    g.endedAt = Date.now() + serverOffset;
     return g;
   });
 }
@@ -749,18 +743,21 @@ function renderOver() {
   let rounds = 0;
   for (let k = 1; k <= (g.round || 0); k++) if (g.rounds?.[rk(k)]?.closed) rounds++;
 
+  const date = new Date(g.endedAt || g.startedAt || now()).toLocaleDateString("zh-CN");
   const hero = g.winRound
-    ? `<div class="burst">相见</div>
-       <h2>第 ${g.winRound} 轮，大家相见了！</h2>
-       <p>所有人都写下了「${esc(g.winWord)}」</p>`
-    : `<h2>这局没能相见</h2>
+    ? `<h2>你们的脑回路相遇了</h2>
+       <p>用了 ${g.winRound} 轮，我们都想到了「${esc(g.winWord)}」</p>`
+    : `<h2>这局没能相遇</h2>
        <p>一共联想了 ${rounds} 轮，换个起点再来一次？</p>`;
 
   app.innerHTML = `
   ${topbar("同词相见 · 结果")}
   <main class="page">
-    <section class="hero result">${hero}</section>
-    ${historyCard(g, list)}
+    <section class="hero result">
+      ${hero}
+      <p class="meta">房间 ${esc(code)} · 共 ${rounds} 轮 · ${date}</p>
+    </section>
+    <section class="rounds-plain">${roundsList(g, list, false).html}</section>
     <div class="cta stack">
       ${host
         ? `<button class="btn primary big" id="again">再来一局</button>`
